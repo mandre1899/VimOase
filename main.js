@@ -720,12 +720,12 @@ class VimoasePlugin extends Plugin {
     this.registerEvent(this.app.workspace.on('window-open', (_w, win) => {
       this.registerDomEvent(win, 'keydown', this.onKeyDown, { capture: true });
     }));
+    // "Keep focus in explorer after clicking a file": see onExplorerFileClick / onFocusIn.
     this.keepFocus = null;
-    // Any mouse press outside the explorer means the user wants focus there: stop reclaiming it.
-    this.registerDomEvent(document, 'mousedown', (e) => {
-      const view = this.explorerView();
-      if (this.keepFocus && (!view || !e.target || !view.containerEl.contains(e.target))) this.keepFocus = null;
-    }, { capture: true });
+    const endKeepFocus = () => { this.keepFocus = null; };
+    this.registerDomEvent(document, 'mousedown', endKeepFocus, { capture: true });
+    this.registerDomEvent(window, 'keydown', endKeepFocus, { capture: true });
+    this.registerDomEvent(document, 'focusin', (e) => this.onFocusIn(e), { capture: true });
     this.registerDomEvent(document, 'click', (e) => {
       const view = this.explorerView();
       if (!view || !e.target || !view.containerEl.contains(e.target)) return;
@@ -739,10 +739,7 @@ class VimoasePlugin extends Plugin {
       this.applyVimMaps();
     });
     this.registerEvent(this.app.workspace.on('layout-change', () => this.syncExplorer()));
-    this.registerEvent(this.app.workspace.on('active-leaf-change', (leaf) => {
-      this.updateCursor();
-      this.reclaimExplorerFocus(leaf);
-    }));
+    this.registerEvent(this.app.workspace.on('active-leaf-change', () => this.updateCursor()));
 
     this.applyCursorStyle();
     this.addSettingTab(new VimoaseSettingTab(this.app, this));
@@ -1627,41 +1624,48 @@ class VimoasePlugin extends Plugin {
   explorerLeaf() { return this.app.workspace.getLeavesOfType('file-explorer')[0] || null; }
   explorerView() { const l = this.explorerLeaf(); return (l && l.view) || null; }
 
-  /* A plain click on a file opens it and Obsidian moves focus to the editor. Bring focus back
-   * to the explorer (cursor on the clicked file) so explorer keys like m / r / d keep working.
-   * Click into the note, or press Enter / l, to edit it. */
+  /* A plain click on a file opens it, and Obsidian then moves focus into the note. Remember the
+   * clicked file; whenever focus lands in a pane showing it, send focus back to the explorer (see
+   * onFocusIn), so explorer keys like m / r / d act on the clicked file. The next mouse press or key
+   * press ends this, so clicking into the note or pressing Enter / l still edits it. */
   onExplorerFileClick(view, e) {
     this.keepFocus = null;
     if (!this.settings.explorerKeys || !this.settings.explorerClickKeepsFocus) return;
-    if (e.button !== 0 || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
-    const self = e.target.closest('.tree-item-self');
-    if (!self || e.target.closest('input, textarea, [contenteditable="true"]')) return;
-    const items = view.fileItems || {};
-    const path = self.getAttribute('data-path') || Object.keys(items).find((p) => items[p] && items[p].selfEl === self);
-    const file = path && this.get(path);
-    if (!(file instanceof TFile)) return;
-    this.keepFocus = { path, until: Date.now() + 800 };
-    window.setTimeout(() => this.reclaimExplorerFocus(null, true), 120);
+    const plainClick = e.button === 0 && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey;
+    if (!plainClick) return;
+    const row = e.target.closest('.tree-item-self');
+    if (!row || e.target.closest('input, textarea, [contenteditable="true"]')) return;
+    const path = row.getAttribute('data-path') || this.pathOfRow(view, row);
+    if (path && this.get(path) instanceof TFile) this.keepFocus = { path };
   }
 
-  reclaimExplorerFocus(leaf, fromTimer) {
+  onFocusIn(e) {
     const pending = this.keepFocus;
-    if (!pending) return;
-    if (Date.now() > pending.until) { this.keepFocus = null; return; }
+    if (!pending || !e.target) return;
     const explorer = this.explorerLeaf();
-    if (!explorer) { this.keepFocus = null; return; }
-    const ws = this.app.workspace;
-    const doc = explorer.view.containerEl.ownerDocument || document;
-    const focusInExplorer = explorer.view.containerEl.contains(doc.activeElement);
-    if (!fromTimer && (!leaf || leaf === explorer)) return;
-    if (fromTimer && ws.activeLeaf === explorer && focusInExplorer) {
+    if (!explorer) {
       this.keepFocus = null;
-      this.focusItemByPath(explorer.view, pending.path);
       return;
     }
-    if (!fromTimer) this.keepFocus = null;
-    ws.setActiveLeaf(explorer, { focus: true });
+    if (explorer.view.containerEl.contains(e.target)) return;
+    const leaf = this.leafContaining(e.target);
+    const file = leaf && leaf.view && leaf.view.file;
+    if (!file || file.path !== pending.path) return;
+    this.app.workspace.setActiveLeaf(explorer, { focus: true });
     this.focusItemByPath(explorer.view, pending.path);
+  }
+
+  pathOfRow(view, row) {
+    const items = view.fileItems || {};
+    return Object.keys(items).find((p) => items[p] && items[p].selfEl === row) || null;
+  }
+
+  leafContaining(el) {
+    let found = null;
+    this.app.workspace.iterateAllLeaves((leaf) => {
+      if (!found && leaf.view && leaf.view.containerEl && leaf.view.containerEl.contains(el)) found = leaf;
+    });
+    return found;
   }
 
   focusItemByPath(view, path) {
