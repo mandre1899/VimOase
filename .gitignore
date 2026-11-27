@@ -1,0 +1,4 @@
+node_modules/
+# Your own settings for this vault, written by Obsidian.
+data.json
+.DS_Store
