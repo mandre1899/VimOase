@@ -116,5 +116,10 @@ Under **Settings → Community plugins → Vimoase**:
 
 ## Installation
 
-Copy `main.js`, `manifest.json` and `styles.css` into `<vault>/.obsidian/plugins/vimoase/`. Then
-enable **Vimoase** under **Settings → Community plugins**.
+Simply clone the repo in your vault's `.obsidian/plugins` folder, or download the latest release and unzip it there. Then enable the plugin in **Settings → Community plugins**.
+
+```bash
+git clone git@github.com:mandre1899/VimOase.git
+
+```
+
