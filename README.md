@@ -34,52 +34,52 @@ the explorer keys.
 
 ### Everywhere
 
-| Keys | Action |
-|---|---|
-| `<leader>ff` / `<leader>fa` | Find files / all files including attachments |
-| `<leader>fw` | Search text across the vault |
-| `<leader>fb` / `<leader>fo` | Open tabs / recent files |
-| `<leader>fh`, `<leader>ca` | Command palette |
-| `<leader>e` / `<C-n>` | Focus explorer (reveal current file) / toggle explorer |
-| `<C-h>` `<C-j>` `<C-l>` | Focus the pane left / below / right |
-| `<Tab>` / `<S-Tab>` | Next / previous tab |
-| `<leader>b` / `<leader>x` | New tab / close tab |
-| `<leader>xt` / `<leader>xT` | Search open tasks / TODO, FIX, FIXME |
-| `<leader>cs` | Outline |
-| `<leader>th` | Choose theme |
-| `<leader>wk` | Search key bindings |
+| Keys                        | Action                                                 |
+| --------------------------- | ------------------------------------------------------ |
+| `<leader>ff` / `<leader>fa` | Find files / all files including attachments           |
+| `<leader>fw`                | Search text across the vault                           |
+| `<leader>fb` / `<leader>fo` | Open tabs / recent files                               |
+| `<leader>fh`, `<leader>ca`  | Command palette                                        |
+| `<leader>e` / `<C-n>`       | Focus explorer (reveal current file) / toggle explorer |
+| `<C-h>` `<C-j>` `<C-l>`     | Focus the pane left / below / right                    |
+| `<Tab>` / `<S-Tab>`         | Next / previous tab                                    |
+| `<leader>b` / `<leader>x`   | New tab / close tab                                    |
+| `<leader>xt` / `<leader>xT` | Search open tasks / TODO, FIX, FIXME                   |
+| `<leader>cs`                | Outline                                                |
+| `<leader>th`                | Choose theme                                           |
+| `<leader>wk`                | Search key bindings                                    |
 
 ### In a note (vim mode)
 
-| Keys | Action |
-|---|---|
-| `gd` / `gr` / `K` | Follow link / backlinks / preview link |
-| `]t` / `[t` | Next / previous TODO or open task |
-| `za` `zo` `zc` `zR` `zM` | Folds |
-| `<leader>/` | Toggle comment |
-| `<leader>rn` | Rename note |
-| `<C-s>` | Save |
-| `<C-c>` `<C-x>` `<C-v>` | Copy, cut, paste with the system clipboard |
-| `<C-q>` | Visual block |
-| `]h` `[h` `<leader>gh…` | Git hunks: next, previous, preview, stage, reset, blame, diff |
+| Keys                     | Action                                                        |
+| ------------------------ | ------------------------------------------------------------- |
+| `gd` / `gr` / `K`        | Follow link / backlinks / preview link                        |
+| `]t` / `[t`              | Next / previous TODO or open task                             |
+| `za` `zo` `zc` `zR` `zM` | Folds                                                         |
+| `<leader>/`              | Toggle comment                                                |
+| `<leader>rn`             | Rename note                                                   |
+| `<C-s>`                  | Save                                                          |
+| `<C-c>` `<C-x>` `<C-v>`  | Copy, cut, paste with the system clipboard                    |
+| `<C-q>`                  | Visual block                                                  |
+| `]h` `[h` `<leader>gh…`  | Git hunks: next, previous, preview, stage, reset, blame, diff |
 
 ### File explorer
 
-| Keys | Action |
-|---|---|
-| `j` / `k` / `gg` / `G` | Down / up / first / last |
-| `l` / `h` | Open file or expand folder / collapse or go to parent |
-| `<CR>` `o` / `<Tab>` | Open / preview (focus stays in the explorer) |
-| `s` / `S` / `t` | Open in vertical split / horizontal split / new tab |
-| `a` / `A` | Create a note, folder, canvas, drawing, … / create a folder |
-| `r` / `d` | Rename / delete |
-| `m` | Move to folder (see below) |
-| `c` `x` `p` | Copy / cut / paste |
-| `y` / `Y` / `gy` | Copy name / relative path / absolute path |
-| `f` | Find and reveal a file |
-| `u` | Undo the last file operation |
-| `z` / `R` / `q` | Collapse all / reload tree / close explorer |
-| `<Esc>` | Back to the editor |
+| Keys                   | Action                                                      |
+| ---------------------- | ----------------------------------------------------------- |
+| `j` / `k` / `gg` / `G` | Down / up / first / last                                    |
+| `l` / `h`              | Open file or expand folder / collapse or go to parent       |
+| `<CR>` `o` / `<Tab>`   | Open / preview (focus stays in the explorer)                |
+| `s` / `S` / `t`        | Open in vertical split / horizontal split / new tab         |
+| `a` / `A`              | Create a note, folder, canvas, drawing, … / create a folder |
+| `r` / `d`              | Rename / delete                                             |
+| `m`                    | Move to folder (see below)                                  |
+| `c` `x` `p`            | Copy / cut / paste                                          |
+| `y` / `Y` / `gy`       | Copy name / relative path / absolute path                   |
+| `f`                    | Find and reveal a file                                      |
+| `u`                    | Undo the last file operation                                |
+| `z` / `R` / `q`        | Collapse all / reload tree / close explorer                 |
+| `<Esc>`                | Back to the editor                                          |
 
 **Move to folder (`m`)** opens a folder browser that starts in the item's own folder and lists only
 its subfolders. Use `↑`/`↓` to pick a folder and <kbd>Enter</kbd> to move there. <kbd>Tab</kbd> or `→`
