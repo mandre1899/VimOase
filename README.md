@@ -1,6 +1,6 @@
 # Vimoase
 
-By **mandre1899**
+By **mandre1899**. This project was vibe coded with [Claude](https://claude.ai) (Claude Code).
 
 Neovim-style keyboard control for Obsidian, modelled on LazyVim.
 
