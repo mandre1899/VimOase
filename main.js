@@ -1,7 +1,7 @@
 'use strict';
 
 /*
- * Vimakase (self-coded)
+ * Vimoase, by mandre1899
  *
  * Neovim-style keys for Obsidian:
  *   - A configurable keymap engine (vim notation, which-key popup, per-context bindings).
@@ -681,7 +681,7 @@ class CheatsheetModal extends Modal {
 
 /* ================================================================== plugin */
 
-class VimakasePlugin extends Plugin {
+class VimoasePlugin extends Plugin {
   async onload() {
     await this.loadSettings();
 
@@ -738,7 +738,7 @@ class VimakasePlugin extends Plugin {
     }));
 
     this.applyCursorStyle();
-    this.addSettingTab(new VimakaseSettingTab(this.app, this));
+    this.addSettingTab(new VimoaseSettingTab(this.app, this));
   }
 
   onunload() {
@@ -913,7 +913,7 @@ class VimakasePlugin extends Plugin {
     add(g, 'pkNext', 'Next result', [P], ['<C-n>'], (ctx) => this.pickerKey(ctx, 'down'));
     add(g, 'pkPrev', 'Previous result', [P], ['<C-p>'], (ctx) => this.pickerKey(ctx, 'up'));
     add(g, 'pkVsplit', 'Open in vertical split', [P], ['<C-v>'], (ctx) => this.pickerKey(ctx, 'vertical'));
-    add(g, 'pkHsplit', 'Open in horizontal split (Vimakase pickers)', [P], ['<C-x>'], (ctx) => this.pickerKey(ctx, 'horizontal'));
+    add(g, 'pkHsplit', 'Open in horizontal split (Vimoase pickers)', [P], ['<C-x>'], (ctx) => this.pickerKey(ctx, 'horizontal'));
     add(g, 'pkTab', 'Open in new tab', [P], ['<C-t>'], (ctx) => this.pickerKey(ctx, 'tab'));
 
     return list;
@@ -1123,7 +1123,7 @@ class VimakasePlugin extends Plugin {
     try {
       for (const t of tokens) Vim.handleKey(ctx.ed.adapter, vimKeyFor(t));
     } catch (err) {
-      console.error('[vimakase-selfcoded] replay', err);
+      console.error('[vimoase] replay', err);
     }
   }
 
@@ -1169,8 +1169,8 @@ class VimakasePlugin extends Plugin {
   }
 
   fail(err) {
-    console.error('[vimakase-selfcoded]', err);
-    new Notice('Vimakase: ' + (err && err.message ? err.message : String(err)));
+    console.error('[vimoase]', err);
+    new Notice('Vimoase: ' + (err && err.message ? err.message : String(err)));
   }
 
   /* ================================================================ editor / vim */
@@ -1223,7 +1223,7 @@ class VimakasePlugin extends Plugin {
   toggleLineNumbers() {
     const vault = this.app.vault;
     if (typeof vault.getConfig !== 'function' || typeof vault.setConfig !== 'function') {
-      new Notice('Vimakase: cannot change line numbers in this Obsidian version');
+      new Notice('Vimoase: cannot change line numbers in this Obsidian version');
       return;
     }
     const next = !vault.getConfig('showLineNumber');
@@ -1489,7 +1489,7 @@ class VimakasePlugin extends Plugin {
         if (operator === 'yank' && (!registerName || registerName === '"') && typeof text === 'string') {
           plugin.writeClipboard(linewise && !text.endsWith('\n') ? text + '\n' : text, !!linewise);
         }
-      } catch (err) { console.error('[vimakase-selfcoded]', err); }
+      } catch (err) { console.error('[vimoase]', err); }
       return result;
     };
     this.patchedRegisters = { rc, original };
@@ -1515,7 +1515,7 @@ class VimakasePlugin extends Plugin {
         Vim.map(lhs, rhs, m.mode || 'normal');
         this.appliedVimMaps.push({ lhs, mode: m.mode || 'normal' });
       } catch (err) {
-        console.error('[vimakase-selfcoded] vim map', m, err);
+        console.error('[vimoase] vim map', m, err);
       }
     }
     if (this.settings.wrapAppend && typeof Vim.defineAction === 'function' && typeof Vim.mapCommand === 'function') {
@@ -1524,7 +1524,7 @@ class VimakasePlugin extends Plugin {
         Vim.mapCommand('A', 'action', 'vmkAppendDisplayLine', {}, { context: 'normal' });
         this.appliedVimMaps.push({ lhs: 'A', mode: 'normal' });
       } catch (err) {
-        console.error('[vimakase-selfcoded] wrap append', err);
+        console.error('[vimoase] wrap append', err);
       }
     }
   }
@@ -1544,7 +1544,7 @@ class VimakasePlugin extends Plugin {
   cmd(id, needsMain) {
     const commands = this.app.commands;
     if (!commands || !commands.commands || !commands.commands[id]) {
-      new Notice('Vimakase: command not available: ' + id);
+      new Notice('Vimoase: command not available: ' + id);
       return false;
     }
     if (needsMain) {
@@ -1565,7 +1565,7 @@ class VimakasePlugin extends Plugin {
       id = Object.keys(commands).find((x) => x.startsWith(spec.plugin + ':') && spec.name.test(commands[x].name || ''));
     }
     if (!id) {
-      new Notice('Vimakase: needs ' + (spec.needs || 'a plugin') + ' (no matching command)');
+      new Notice('Vimoase: needs ' + (spec.needs || 'a plugin') + ' (no matching command)');
       return false;
     }
     return this.cmd(id);
@@ -1831,7 +1831,7 @@ class VimakasePlugin extends Plugin {
     }
     if (what === 'tab') send('Enter', mod);
     else if (what === 'vertical') send('Enter', Object.assign({ altKey: true }, mod));
-    else new Notice('Horizontal split is only available in Vimakase pickers');
+    else new Notice('Horizontal split is only available in Vimoase pickers');
   }
 
   /* ================================================================ explorer: scope, cursor */
@@ -2223,7 +2223,7 @@ class VimakasePlugin extends Plugin {
         id: 'excalidraw', label: 'Excalidraw drawing', keys: ['.excalidraw.md', '.excalidraw', '.exd', '.ex'], ext,
         content: async () => {
           if (!s.compatibilityMode && ex && typeof ex.getBlankDrawing === 'function') {
-            try { const d = await ex.getBlankDrawing(); if (typeof d === 'string') return d; } catch (e) { console.warn('vimakase: excalidraw template', e); }
+            try { const d = await ex.getBlankDrawing(); if (typeof d === 'string') return d; } catch (e) { console.warn('vimoase: excalidraw template', e); }
           }
           return s.compatibilityMode ? BLANK_EXCALIDRAW_JSON : BLANK_EXCALIDRAW_MD;
         },
@@ -2536,7 +2536,7 @@ class VimakasePlugin extends Plugin {
 
 /* ================================================================== settings */
 
-class VimakaseSettingTab extends PluginSettingTab {
+class VimoaseSettingTab extends PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -2677,5 +2677,5 @@ class VimakaseSettingTab extends PluginSettingTab {
   }
 }
 
-module.exports = VimakasePlugin;
+module.exports = VimoasePlugin;
 module.exports._test = { parseSeq, parseToken, eventToken, displaySeq };
