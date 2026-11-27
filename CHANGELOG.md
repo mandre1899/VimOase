@@ -37,6 +37,10 @@
 - `m` (and Copy to folder) did nothing unless the j/k cursor was on an item. It now falls back to the
   clicked or highlighted item, then to the open file, and shows a notice when there's nothing to act on
   or when the item is the vault root.
+- Deleting (`d`) a large folder no longer reads every file into memory first. The undo copy is skipped
+  for anything over 50 MB: the delete prompt says so and where the files will go (system trash, the
+  vault's `.trash` folder, or permanently, following Obsidian's "Deleted files" setting). Undo copies
+  together are capped at 200 MB, and the oldest are dropped first.
 
 ## 0.1.0
 

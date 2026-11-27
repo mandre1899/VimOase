@@ -219,6 +219,12 @@ const CONTEXT_LABEL = Object.fromEntries(CONTEXTS);
 const N = 'normal', V = 'visual', I = 'insert', O = 'other', E = 'explorer', P = 'picker';
 const LEADER = [N, O, E];
 
+/* Deleting keeps an in-memory copy so `u` can restore it. Skip the copy for anything bigger than
+ * UNDO_SNAPSHOT_LIMIT, and drop the oldest copies once all of them together pass UNDO_MEMORY_LIMIT. */
+const UNDO_SNAPSHOT_LIMIT = 50 * 1024 * 1024;
+const UNDO_MEMORY_LIMIT = 200 * 1024 * 1024;
+const formatMB = (bytes) => (bytes / (1024 * 1024)).toFixed(bytes < 10 * 1024 * 1024 ? 1 : 0) + ' MB';
+
 const DEFAULT_SETTINGS = {
   explorerKeys: true,
   explorerClickKeepsFocus: true,
@@ -2177,9 +2183,32 @@ class VimoasePlugin extends Plugin {
     return candidate;
   }
 
-  pushUndo(label, run) {
-    this.undoStack.push({ label, run });
+  pushUndo(label, run, bytes) {
+    this.undoStack.push({ label, run, bytes: bytes || 0 });
     if (this.undoStack.length > 100) this.undoStack.shift();
+    let total = this.undoStack.reduce((n, e) => n + e.bytes, 0);
+    while (total > UNDO_MEMORY_LIMIT) {
+      const i = this.undoStack.findIndex((e) => e.bytes > 0);
+      if (i < 0 || i === this.undoStack.length - 1) break;
+      total -= this.undoStack[i].bytes;
+      this.undoStack.splice(i, 1);
+    }
+  }
+
+  /* Total size in bytes of a file, or of every file inside a folder. */
+  treeSize(f) {
+    if (f instanceof TFile) return (f.stat && f.stat.size) || 0;
+    let n = 0;
+    for (const c of f.children || []) n += this.treeSize(c);
+    return n;
+  }
+
+  /* Where Obsidian's "Deleted files" setting sends trashed files. */
+  trashLabel() {
+    const opt = typeof this.app.vault.getConfig === 'function' ? this.app.vault.getConfig('trashOption') : null;
+    if (opt === 'none') return 'deleted permanently';
+    if (opt === 'local') return 'moved to the vault\'s .trash folder';
+    return 'moved to the system trash';
   }
 
   async trash(file) {
@@ -2380,15 +2409,20 @@ class VimoasePlugin extends Plugin {
       obsidian.Vault.recurseChildren(file, () => count++);
       message = 'Delete folder "' + file.path + '" and its ' + (count - 1) + ' item(s)?';
     }
+    const bytes = this.treeSize(file);
+    const undoable = bytes <= UNDO_SNAPSHOT_LIMIT;
+    if (!undoable) message += ' It is too large to undo with u (' + formatMB(bytes) + ') and will be ' + this.trashLabel() + '.';
     new ConfirmModal(this.app, {
       title: 'Delete',
       message,
       onCancel: () => this.refocus(view),
       onConfirm: () => this.wrap(async () => {
         const idx = this.visibleItems(view).indexOf(view.fileItems[file.path]);
-        const snap = await this.snapshot(file);
+        const path = file.path;
+        const snap = undoable ? await this.snapshot(file) : null;
         await this.trash(file);
-        this.pushUndo('delete ' + snap.path, () => this.restoreSnapshot(snap));
+        if (snap) this.pushUndo('delete ' + path, () => this.restoreSnapshot(snap), bytes);
+        else new Notice('"' + path + '" ' + this.trashLabel() + ' (too large to undo)');
         await this.focusExplorer();
         const remaining = this.visibleItems(view);
         if (remaining.length) this.setFocus(view, remaining[Math.max(0, Math.min(idx, remaining.length - 1))]);
