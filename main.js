@@ -221,6 +221,7 @@ const LEADER = [N, O, E];
 
 const DEFAULT_SETTINGS = {
   explorerKeys: true,
+  explorerClickKeepsFocus: true,
   yankToClipboard: true,
   whichKeyDelay: 200,
   sequenceTimeout: 0,
@@ -712,9 +713,17 @@ class VimakasePlugin extends Plugin {
     this.registerEvent(this.app.workspace.on('window-open', (_w, win) => {
       this.registerDomEvent(win, 'keydown', this.onKeyDown, { capture: true });
     }));
+    this.keepFocus = null;
+    // Any mouse press outside the explorer means the user wants focus there: stop reclaiming it.
+    this.registerDomEvent(document, 'mousedown', (e) => {
+      const view = this.explorerView();
+      if (this.keepFocus && (!view || !e.target || !view.containerEl.contains(e.target))) this.keepFocus = null;
+    }, { capture: true });
     this.registerDomEvent(document, 'click', (e) => {
       const view = this.explorerView();
-      if (view && e.target && view.containerEl.contains(e.target)) window.setTimeout(() => this.updateCursor(), 0);
+      if (!view || !e.target || !view.containerEl.contains(e.target)) return;
+      window.setTimeout(() => this.updateCursor(), 0);
+      this.onExplorerFileClick(view, e);
     }, { capture: true });
 
     this.app.workspace.onLayoutReady(() => {
@@ -723,7 +732,10 @@ class VimakasePlugin extends Plugin {
       this.applyVimMaps();
     });
     this.registerEvent(this.app.workspace.on('layout-change', () => this.syncExplorer()));
-    this.registerEvent(this.app.workspace.on('active-leaf-change', () => this.updateCursor()));
+    this.registerEvent(this.app.workspace.on('active-leaf-change', (leaf) => {
+      this.updateCursor();
+      this.reclaimExplorerFocus(leaf);
+    }));
 
     this.applyCursorStyle();
     this.addSettingTab(new VimakaseSettingTab(this.app, this));
@@ -1607,6 +1619,50 @@ class VimakasePlugin extends Plugin {
 
   explorerLeaf() { return this.app.workspace.getLeavesOfType('file-explorer')[0] || null; }
   explorerView() { const l = this.explorerLeaf(); return (l && l.view) || null; }
+
+  /* A plain click on a file opens it and Obsidian moves focus to the editor. Bring focus back
+   * to the explorer (cursor on the clicked file) so explorer keys like m / r / d keep working.
+   * Click into the note, or press Enter / l, to edit it. */
+  onExplorerFileClick(view, e) {
+    this.keepFocus = null;
+    if (!this.settings.explorerKeys || !this.settings.explorerClickKeepsFocus) return;
+    if (e.button !== 0 || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
+    const self = e.target.closest('.tree-item-self');
+    if (!self || e.target.closest('input, textarea, [contenteditable="true"]')) return;
+    const items = view.fileItems || {};
+    const path = self.getAttribute('data-path') || Object.keys(items).find((p) => items[p] && items[p].selfEl === self);
+    const file = path && this.get(path);
+    if (!(file instanceof TFile)) return;
+    this.keepFocus = { path, until: Date.now() + 800 };
+    window.setTimeout(() => this.reclaimExplorerFocus(null, true), 120);
+  }
+
+  reclaimExplorerFocus(leaf, fromTimer) {
+    const pending = this.keepFocus;
+    if (!pending) return;
+    if (Date.now() > pending.until) { this.keepFocus = null; return; }
+    const explorer = this.explorerLeaf();
+    if (!explorer) { this.keepFocus = null; return; }
+    const ws = this.app.workspace;
+    const doc = explorer.view.containerEl.ownerDocument || document;
+    const focusInExplorer = explorer.view.containerEl.contains(doc.activeElement);
+    if (!fromTimer && (!leaf || leaf === explorer)) return;
+    if (fromTimer && ws.activeLeaf === explorer && focusInExplorer) {
+      this.keepFocus = null;
+      this.focusItemByPath(explorer.view, pending.path);
+      return;
+    }
+    if (!fromTimer) this.keepFocus = null;
+    ws.setActiveLeaf(explorer, { focus: true });
+    this.focusItemByPath(explorer.view, pending.path);
+  }
+
+  focusItemByPath(view, path) {
+    const item = view.fileItems && view.fileItems[path];
+    if (item) this.setFocus(view, item);
+    const el = view.containerEl.querySelector('.nav-files-container') || view.containerEl;
+    if (el && typeof el.focus === 'function' && !el.contains(el.ownerDocument.activeElement)) el.focus({ preventScroll: true });
+  }
 
   isExplorerFocus(target) {
     const leaf = this.explorerLeaf();
@@ -2510,6 +2566,8 @@ class VimakaseSettingTab extends PluginSettingTab {
     new Setting(containerEl).setName('General').setHeading();
     new Setting(containerEl).setName('File explorer keys').setDesc('Use the explorer bindings below while the file explorer is focused.')
       .addToggle((t) => t.setValue(s.explorerKeys).onChange((v) => { s.explorerKeys = v; changed(); }));
+    new Setting(containerEl).setName('Keep focus in explorer after clicking a file').setDesc('Clicking a file still opens it, but keys stay in the file explorer (m, r, d … act on the clicked file). Click into the note or press Enter / l to edit it.')
+      .addToggle((t) => t.setValue(s.explorerClickKeepsFocus).onChange((v) => { s.explorerClickKeepsFocus = v; changed(); }));
     new Setting(containerEl).setName('Yank to system clipboard').setDesc('y, yy, yw … into the unnamed register also go to the system clipboard. Deletes stay in vim registers.')
       .addToggle((t) => t.setValue(s.yankToClipboard).onChange((v) => { s.yankToClipboard = v; changed(); }));
     new Setting(containerEl).setName('Which-key popup delay').setDesc('Milliseconds before the popup with the next possible keys appears.').addText(num('whichKeyDelay'));
