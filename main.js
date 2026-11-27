@@ -1099,7 +1099,10 @@ function buildRows({ item, mode, folder, query, vault }) {
   const typed = query.trim();
   const rows = [];
   const isCurrent = (f) => mode === "move" && (item.parent || vault.root) === f;
-  const nameTaken = (f) => !!vault.get(joinPath(folderPath(f), item.name));
+  const nameTaken = (f) => {
+    const existing = vault.get(joinPath(folderPath(f), item.name));
+    return !!existing && existing !== item;
+  };
   if (!typed) {
     const blocked = isInsideItself(item, folderPath(folder));
     const note = blocked ? "inside itself" : isCurrent(folder) ? "current" : "";
@@ -1116,7 +1119,7 @@ function buildRows({ item, mode, folder, query, vault }) {
       if (blocked) note = f === item ? "this folder" : "inside itself";
       else if (isCurrent(f)) note = "current";
       else if (taken) note = "name taken";
-      rows.push({ kind: "folder", label: f.name, folder: f, disabled: blocked, note, warn: taken, match: m.match });
+      rows.push({ kind: "folder", label: f.name, folder: f, disabled: blocked, note, warn: taken && note === "name taken", match: m.match });
     }
   }
   if (typed && typed !== "." && typed !== "..") {

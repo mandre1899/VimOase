@@ -102,8 +102,11 @@ export function buildRows({ item, mode, folder, query, vault }: RowsInput): Pick
   const typed = query.trim();
   const rows: PickerRow[] = [];
   const isCurrent = (f: TFolder) => mode === 'move' && (item.parent || vault.root) === f;
-  // An item with the same name is already there.
-  const nameTaken = (f: TFolder) => !!vault.get(joinPath(folderPath(f), item.name));
+  // Another item with the same name is already there (the item itself doesn't count).
+  const nameTaken = (f: TFolder) => {
+    const existing = vault.get(joinPath(folderPath(f), item.name));
+    return !!existing && existing !== item;
+  };
 
   // "move here" and "..", shown while nothing is typed.
   if (!typed) {
@@ -127,7 +130,7 @@ export function buildRows({ item, mode, folder, query, vault }: RowsInput): Pick
       if (blocked) note = f === item ? 'this folder' : 'inside itself';
       else if (isCurrent(f)) note = 'current';
       else if (taken) note = 'name taken';
-      rows.push({ kind: 'folder', label: f.name, folder: f, disabled: blocked, note, warn: taken, match: m.match });
+      rows.push({ kind: 'folder', label: f.name, folder: f, disabled: blocked, note, warn: taken && note === 'name taken', match: m.match });
     }
   }
 
