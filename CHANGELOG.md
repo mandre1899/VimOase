@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- **Rewritten in TypeScript and split into modules** under `src/` (see Development in the README),
+  bundled into `main.js` with esbuild. Behaviour and key bindings are unchanged.
+- **Type checking, linting and tests**: `npm run check` runs `tsc`, ESLint and vitest. The compiler's
+  `override` checks would have caught the 0.2.0 bug where the folder picker never opened.
+- **Keep focus in explorer after clicking a file** no longer waits fixed times for Obsidian to open the
+  note. It reacts to focus moving into the clicked note and stops at your next key or mouse press,
+  so slow-opening notes are handled too.
+- The Move to folder picker code is simpler, with its logic in a separate, tested module.
+
+### Fixed
+
+- The Move to picker marked the item's own folder as *name taken* (shown in red next to *current*),
+  because it counted the item itself.
+- Editing vim mappings in the settings could change the built-in defaults in memory, so **Reset
+  mappings** might not reset them until Obsidian restarted.
+
 ## 0.2.0 — 2026-11-27
 
 ### Changed

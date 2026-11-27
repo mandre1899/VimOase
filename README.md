@@ -9,7 +9,7 @@ by keyboard too: a <kbd>Space</kbd> leader key with a which-key popup, pane and 
 pickers, folds, link navigation, system-clipboard yanks, and a neo-tree-style file explorer you drive
 with `h j k l`. You can use Obsidian the way you use Neovim, without reaching for the mouse.
 
-A desktop-only plugin by mandre1899, written in plain JavaScript (no build step).
+A desktop-only plugin by mandre1899, written in TypeScript.
 
 ## What it does
 
@@ -123,12 +123,60 @@ git clone git@github.com:mandre1899/VimOase.git
 
 ```
 
+## Development
+
+The source is TypeScript in `src/`, bundled by esbuild into the `main.js` that Obsidian loads.
+`main.js` is committed, so cloning the repo gives a working plugin; rebuild it after changing `src/`.
+
+```bash
+npm install
+```
+
+| Command | What it does |
+|---|---|
+| `npm run dev` | Rebuild `main.js` on every change (reload the plugin in Obsidian to see it) |
+| `npm run build` | Type-check, then build `main.js` |
+| `npm run check` | Type check, lint and tests: run before committing |
+| `npm test` | Unit tests, plus a smoke test of the built `main.js` |
+
+```text
+src/
+  main.ts                 plugin entry: creates the parts below and wires up events
+  settings.ts             settings, defaults, and migrating older saved settings
+  settings-tab.ts         the settings page
+  obsidian-internals.ts   types for the undocumented Obsidian / CodeMirror APIs used
+  keys/
+    notation.ts           key notation: "<leader>ff", "<C-s>" ⇄ key events
+    keymap.ts             actions, user overrides, and the per-context key tries
+    actions.ts            every action with its label, contexts and default keys
+    engine.ts             the keydown handler: contexts, sequences, which-key timing
+  editor/
+    vim.ts                finding the editor, yank-to-clipboard, vim mappings
+    clipboard.ts          Ctrl-A / C / X / V in vim mode
+    commands.ts           other editor actions (folds, TODO jumps, link preview, …)
+  explorer/
+    explorer.ts           finding / focusing the explorer, its cursor and own keys
+    navigation.ts         j k h l gg G … and opening files
+    keep-focus.ts         keep focus in the explorer after clicking a file
+    file-ops.ts           create, rename, delete, move / copy, cut / paste, undo
+    create-types.ts       what the `a` prompt can create
+    undo.ts               the undo stack and its memory limits
+  workspace/
+    navigation.ts         commands, panes, opening files
+    pickers.ts            file / tab / binding pickers and Ctrl-n/p/v/x/t in pickers
+  ui/
+    folder-picker/        the Move to folder browser (rows.ts has its logic, modal.ts the UI)
+    prompt-modal.ts, confirm-modal.ts, cheatsheet-modal.ts, which-key.ts, create-hints.ts
+  util/                   paths, cursor positions, DOM and error helpers
+tests/                    vitest tests; tests/stubs/obsidian.ts stands in for the obsidian module
+```
+
 ## Credits
 
 Vimoase is inspired by [Vimakase](https://github.com/jelenv/obsidian-vimakase) by
 [jelenv](https://github.com/jelenv) (MIT license). Vimakase came up with the idea of a LazyVim-style
 setup for Obsidian: space leader keys with a which-key popup, vim clipboard keys, and a neo-tree-style
-file explorer. Vimoase is a separate plain-JavaScript implementation of that idea with its own
+file explorer. Vimoase is a separate implementation of that idea with its own
 additions.
 
 Vimakase in turn credits [LazyVim](https://github.com/LazyVim/LazyVim),
