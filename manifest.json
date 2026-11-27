@@ -1,7 +1,7 @@
 {
   "id": "vimoase",
   "name": "Vimoase",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "minAppVersion": "1.8.7",
   "description": "LazyVim-style keys for Obsidian: space leader keys with a which-key popup, vim clipboard keys, and neo-tree-style vim keys for the file explorer.",
   "author": "mandre1899",
