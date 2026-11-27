@@ -1879,6 +1879,23 @@ class VimakasePlugin extends Plugin {
   focusedItem(view) { return (view.tree && view.tree.focusedItem) || null; }
   focusedFile(view) { const i = this.focusedItem(view); return (i && i.file) || null; }
 
+  /* The item an explorer command acts on: the keyboard cursor, else the item highlighted by a
+   * mouse click (selection / active row), else the file open in the editor. */
+  targetFile(view) {
+    const focused = this.focusedFile(view);
+    if (focused) return focused;
+    const tree = view.tree || {};
+    const fromDom = (d) => (d && d.file) || null;
+    const sel = tree.selectedDoms;
+    if (sel && typeof sel.size === 'number' && sel.size === 1) {
+      const f = fromDom(sel.values().next().value);
+      if (f) return f;
+    }
+    const active = fromDom(tree.activeDom) || fromDom(view.activeDom);
+    if (active) return active;
+    return this.app.workspace.getActiveFile() || null;
+  }
+
   setFocus(view, item) {
     if (!item) return;
     if (view.tree && typeof view.tree.setFocusedItem === 'function') view.tree.setFocusedItem(item, true);
@@ -2377,8 +2394,11 @@ class VimakasePlugin extends Plugin {
   }
 
   exMoveOrCopy(view, mode) {
-    const file = this.focusedFile(view);
-    if (!file || (file instanceof TFolder && file.isRoot())) return;
+    const file = this.targetFile(view);
+    if (!file) return new Notice('Nothing to ' + mode + ': put the cursor on a file or folder');
+    if (file instanceof TFolder && file.isRoot()) return new Notice('The vault root cannot be ' + (mode === 'move' ? 'moved' : 'copied'));
+    const item = view.fileItems && view.fileItems[file.path];
+    if (item && item !== this.focusedItem(view)) this.setFocus(view, item);
     new FolderPickerModal(this.app, {
       mode,
       file,
