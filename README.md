@@ -123,3 +123,14 @@ git clone git@github.com:mandre1899/VimOase.git
 
 ```
 
+## Credits
+
+Vimoase is inspired by [Vimakase](https://github.com/jelenv/obsidian-vimakase) by
+[jelenv](https://github.com/jelenv) (MIT license). Vimakase came up with the idea of a LazyVim-style
+setup for Obsidian: space leader keys with a which-key popup, vim clipboard keys, and a neo-tree-style
+file explorer. Vimoase is a separate plain-JavaScript implementation of that idea with its own
+additions.
+
+Vimakase in turn credits [LazyVim](https://github.com/LazyVim/LazyVim),
+[neo-tree.nvim](https://github.com/nvim-neo-tree/neo-tree.nvim) and
+[Sidebar Keyboard Navigation](https://github.com/denvolok/obsidian-sidebar-keyboard-navigation).
