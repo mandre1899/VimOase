@@ -397,7 +397,7 @@ class FolderPickerModal extends Modal {
 
   subfolders(folder) {
     return folder.children.filter((c) => c instanceof TFolder)
-      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+      .sort((a, b) => FOLDER_COLLATOR.compare(a.name, b.name));
   }
 
   /* ---------------------------------------------------------------- navigation */
@@ -532,11 +532,11 @@ class FolderPickerModal extends Modal {
       scored.sort((a, b) => a.score - b.score);
       for (const { f, hit } of scored) {
         const blocked = this.blocked(f);
-        const kids = this.subfolders(f).length;
+        const isTaken = !blocked && taken(f);
         rows.push({
-          kind: 'folder', folder: f, disabled: blocked, label: f.name, hit, hitLen: filter.length, kids,
-          meta: blocked ? (f === file ? 'this folder' : 'inside itself') : (mode === 'move' && sameParent(f) ? 'current' : (taken(f) ? 'name taken' : '')),
-          warn: !blocked && taken(f),
+          kind: 'folder', folder: f, disabled: blocked, label: f.name, hit, hitLen: filter.length,
+          meta: blocked ? (f === file ? 'this folder' : 'inside itself') : (mode === 'move' && sameParent(f) ? 'current' : (isTaken ? 'name taken' : '')),
+          warn: isTaken,
         });
       }
     }
@@ -575,7 +575,6 @@ class FolderPickerModal extends Modal {
         text.appendText(row.label.slice(row.hit + row.hitLen));
       } else text.setText(row.label);
       if (row.kind === 'folder') text.createSpan({ cls: 'vmk-fp-slash', text: '/' });
-      if (row.sub) el.createSpan({ cls: 'vmk-fp-sub', text: row.sub });
       if (row.meta) el.createSpan({ cls: 'vmk-fp-meta' + (row.warn ? ' is-warn' : ''), text: row.meta });
       if (row.kind === 'folder' && !row.disabled) {
         const open = el.createSpan({ cls: 'vmk-fp-open', text: '›', attr: { 'aria-label': 'Open folder' } });
@@ -614,6 +613,8 @@ class FolderPickerModal extends Modal {
     }
   }
 }
+
+const FOLDER_COLLATOR = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
 function isSubsequence(needle, hay) {
   let j = 0;
