@@ -760,7 +760,7 @@ function migrateSettings(saved) {
   delete data.clipboardKeys;
   const settings = { ...DEFAULT_SETTINGS, ...data };
   settings.keymap = { ...data.keymap || {} };
-  settings.vimMaps = Array.isArray(settings.vimMaps) ? settings.vimMaps : defaultVimMaps();
+  settings.vimMaps = Array.isArray(data.vimMaps) ? data.vimMaps : defaultVimMaps();
   return settings;
 }
 

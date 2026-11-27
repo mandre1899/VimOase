@@ -66,6 +66,7 @@ export function migrateSettings(saved: unknown): VimoaseSettings {
 
   const settings = { ...DEFAULT_SETTINGS, ...data } as VimoaseSettings;
   settings.keymap = { ...((data.keymap as Record<string, string[]> | undefined) || {}) };
-  settings.vimMaps = Array.isArray(settings.vimMaps) ? settings.vimMaps : defaultVimMaps();
+  // Fresh copies, so editing mappings never changes the defaults.
+  settings.vimMaps = Array.isArray(data.vimMaps) ? (data.vimMaps as VimMapping[]) : defaultVimMaps();
   return settings;
 }
