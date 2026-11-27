@@ -318,6 +318,308 @@ class ConfirmModal extends Modal {
   }
 }
 
+/* Folder browser for "Move to" / "Copy to". Lists only the subfolders of the folder being
+ * browsed, plus "here" and "..". Breadcrumbs jump to any ancestor; the input filters the list
+ * and also takes paths: "../", "/" (vault root), "a/b/" navigate as you type, and a path that
+ * does not exist yet offers to create it (or to rename the item on the way).
+ *
+ * opts: { mode: 'move' | 'copy', file, start: TFolder, onSubmit({ kind: 'into' | 'exact', path }), onCancel } */
+class FolderPickerModal extends Modal {
+  constructor(app, opts) {
+    super(app);
+    this.opts = opts;
+    this.submitted = false;
+    this.folder = opts.start;
+    this.rows = [];
+    this.sel = 0;
+  }
+
+  get verb() { return this.opts.mode === 'move' ? 'Move' : 'Copy'; }
+
+  onOpen() {
+    const { contentEl, opts } = this;
+    this.modalEl.addClass('vmk-fp-modal');
+    this.titleEl.empty();
+
+    // One prompt line: the browsed path (click a segment to jump there) followed by the input.
+    const line = contentEl.createDiv({ cls: 'vmk-fp-line' });
+    this.crumbsEl = line.createSpan({ cls: 'vmk-fp-crumbs' });
+    this.input = line.createEl('input', {
+      type: 'text',
+      cls: 'vmk-fp-input',
+      attr: { placeholder: this.verb.toLowerCase() + ' ' + opts.file.name + ' to…', spellcheck: 'false', autocomplete: 'off' },
+    });
+    this.input.addEventListener('input', () => this.onInput());
+    this.input.addEventListener('keydown', (ev) => this.onKey(ev));
+    line.addEventListener('click', (ev) => { if (ev.target === line) this.input.focus(); });
+
+    this.listEl = contentEl.createDiv({ cls: 'vmk-fp-list' });
+    contentEl.createDiv({ cls: 'vmk-fp-hint', text: '↵ ' + this.verb.toLowerCase() + '   ⇥ open   ⌫ up   ⇧↵ here' });
+
+    this.render(true);
+    window.setTimeout(() => this.input.focus(), 0);
+  }
+
+  onClose() {
+    this.contentEl.empty();
+    if (!this.submitted && this.opts.onCancel) this.opts.onCancel();
+  }
+
+  /* ---------------------------------------------------------------- paths */
+
+  root() { return this.app.vault.getRoot(); }
+  pathOf(folder) { return folder.isRoot() ? '/' : folder.path; }
+
+  /* Resolve a typed path against the browsed folder: "/x" is from the vault root, ".." and "." work. */
+  resolvePath(q) {
+    const parts = q.startsWith('/') || this.folder.isRoot() ? [] : this.folder.path.split('/');
+    for (const seg of q.split('/')) {
+      if (!seg || seg === '.') continue;
+      if (seg === '..') parts.pop();
+      else parts.push(seg);
+    }
+    return parts.join('/');
+  }
+
+  folderAt(path) {
+    if (!path) return this.root();
+    const f = this.app.vault.getAbstractFileByPath(normalizePath(path));
+    return f instanceof TFolder ? f : null;
+  }
+
+  /* Can the item go into this folder? A folder cannot go into itself or its own subfolders. */
+  blocked(folder) {
+    const file = this.opts.file;
+    if (!(file instanceof TFolder)) return false;
+    return (this.pathOf(folder) + '/').startsWith(file.path + '/');
+  }
+
+  subfolders(folder) {
+    return folder.children.filter((c) => c instanceof TFolder)
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+  }
+
+  /* ---------------------------------------------------------------- navigation */
+
+  navigate(folder) {
+    if (!folder || folder === this.folder) return;
+    const from = this.folder;
+    this.folder = folder;
+    this.input.value = '';
+    this.render(true, from);
+  }
+
+  goUp() { if (!this.folder.isRoot()) this.navigate(this.folder.parent || this.root()); }
+
+  openRow(row) {
+    if (!row || row.disabled) return;
+    if (row.kind === 'up') this.goUp();
+    else if (row.kind === 'folder') this.navigate(row.folder);
+  }
+
+  onInput() {
+    const q = this.input.value;
+    const slash = q.lastIndexOf('/');
+    if (slash >= 0) {
+      const dir = this.folderAt(this.resolvePath(q.slice(0, slash + 1)));
+      if (dir) {
+        const from = this.folder;
+        this.folder = dir;
+        this.input.value = q.slice(slash + 1);
+        return this.render(true, from);
+      }
+    }
+    this.render(false);
+  }
+
+  /* ---------------------------------------------------------------- choosing */
+
+  submit(target) {
+    this.submitted = true;
+    this.close();
+    this.opts.onSubmit(target);
+  }
+
+  activate(row) {
+    if (!row || row.disabled) return;
+    if (row.kind === 'up') return this.goUp();
+    if (row.kind === 'here' || row.kind === 'folder') return this.submit({ kind: 'into', path: this.pathOf(row.folder) });
+    if (row.kind === 'newFolder') return this.submit({ kind: 'into', path: row.path });
+    if (row.kind === 'rename') return this.submit({ kind: 'exact', path: row.path });
+  }
+
+  submitHere() { if (!this.blocked(this.folder)) this.submit({ kind: 'into', path: this.pathOf(this.folder) }); }
+
+  moveSel(delta) {
+    const n = this.rows.length;
+    if (!n) return;
+    let i = this.sel;
+    for (let step = 0; step < n; step++) {
+      i = (i + delta + n) % n;
+      if (!this.rows[i].disabled) break;
+    }
+    this.setSel(i);
+  }
+
+  setSel(i) {
+    this.sel = i;
+    this.rows.forEach((r, j) => r.el && r.el.toggleClass('is-selected', j === i));
+    const el = this.rows[i] && this.rows[i].el;
+    if (el) el.scrollIntoView({ block: 'nearest' });
+  }
+
+  onKey(ev) {
+    if (ev.isComposing) return;
+    const input = this.input;
+    const ctrl = ev.ctrlKey && !ev.metaKey && !ev.altKey;
+    const atStart = input.selectionStart === 0 && input.selectionEnd === 0;
+    const atEnd = input.selectionStart === input.value.length;
+    const row = this.rows[this.sel];
+    let handled = true;
+    if (ev.key === 'ArrowDown' || (ctrl && (ev.key === 'n' || ev.key === 'j'))) this.moveSel(1);
+    else if (ev.key === 'ArrowUp' || (ctrl && (ev.key === 'p' || ev.key === 'k'))) this.moveSel(-1);
+    else if (ev.key === 'Enter') {
+      if (ev.shiftKey || ev.metaKey || ev.ctrlKey) this.submitHere();
+      else if (input.value.trim() === '..') this.goUp();
+      else this.activate(row);
+    } else if (ev.key === 'Tab') {
+      if (ev.shiftKey) this.goUp();
+      else this.openRow(row);
+    } else if ((ev.key === 'ArrowRight' && atEnd && !ev.shiftKey) || (ctrl && ev.key === 'l')) {
+      if (row && (row.kind === 'folder' || row.kind === 'up')) this.openRow(row);
+      else handled = false;
+    } else if ((ev.key === 'ArrowLeft' && atStart && !ev.shiftKey) || (ev.key === 'Backspace' && !input.value) || (ctrl && ev.key === 'h' && !input.value)) {
+      this.goUp();
+    } else handled = false;
+    if (handled) { ev.preventDefault(); ev.stopPropagation(); }
+  }
+
+  /* ---------------------------------------------------------------- rendering */
+
+  buildRows() {
+    const { file, mode } = this.opts;
+    const q = this.input.value;
+    const trimmed = q.trim();
+    const rows = [];
+    const inPath = q.includes('/'); // a path whose folder part does not exist (onInput consumed the rest)
+    const filter = inPath ? null : trimmed.toLowerCase();
+    const sameParent = (f) => (file.parent || this.root()) === f;
+    const taken = (f) => !!this.app.vault.getAbstractFileByPath(joinPath(this.pathOf(f), file.name));
+
+    if (!trimmed) {
+      const blocked = this.blocked(this.folder);
+      rows.push({
+        kind: 'here', folder: this.folder, disabled: blocked,
+        label: this.verb.toLowerCase() + ' here',
+        meta: blocked ? 'inside itself' : (mode === 'move' && sameParent(this.folder) ? 'current' : ''),
+      });
+      if (!this.folder.isRoot()) rows.push({ kind: 'up', label: '..' });
+    }
+
+    if (filter !== null) {
+      const scored = [];
+      for (const f of this.subfolders(this.folder)) {
+        const name = f.name.toLowerCase();
+        let score = -1;
+        let hit = -1;
+        if (!filter) score = 0;
+        else if (name.startsWith(filter)) { score = 0; hit = 0; }
+        else if ((hit = name.indexOf(filter)) >= 0) score = 1;
+        else if (isSubsequence(filter, name)) score = 2;
+        if (score >= 0) scored.push({ f, score, hit });
+      }
+      scored.sort((a, b) => a.score - b.score);
+      for (const { f, hit } of scored) {
+        const blocked = this.blocked(f);
+        const kids = this.subfolders(f).length;
+        rows.push({
+          kind: 'folder', folder: f, disabled: blocked, label: f.name, hit, hitLen: filter.length, kids,
+          meta: blocked ? (f === file ? 'this folder' : 'inside itself') : (mode === 'move' && sameParent(f) ? 'current' : (taken(f) ? 'name taken' : '')),
+          warn: !blocked && taken(f),
+        });
+      }
+    }
+
+    if (trimmed && trimmed !== '.' && trimmed !== '..') {
+      const target = this.resolvePath(trimmed);
+      const exists = target && this.app.vault.getAbstractFileByPath(normalizePath(target));
+      if (target && !exists) {
+        const blocked = file instanceof TFolder && (target + '/').startsWith(file.path + '/');
+        rows.push({ kind: 'newFolder', path: target, disabled: blocked, label: '+ ' + target + '/', meta: blocked ? 'inside itself' : 'new folder' });
+        if (!trimmed.endsWith('/')) rows.push({ kind: 'rename', path: target, disabled: blocked, label: '→ ' + target, meta: 'rename' });
+      }
+    }
+    return rows;
+  }
+
+  render(navigated, from) {
+    this.renderCrumbs();
+    this.rows = this.buildRows();
+    this.listEl.empty();
+
+    if (!this.rows.some((r) => r.kind === 'folder')) {
+      const q = this.input.value.trim();
+      const msg = q && !q.includes('/') ? 'no match' : (q ? '' : 'no subfolders');
+      if (msg) this.listEl.createDiv({ cls: 'vmk-fp-empty', text: msg });
+    }
+
+    this.rows.forEach((row, i) => {
+      const el = this.listEl.createDiv({ cls: 'vmk-fp-row vmk-fp-' + row.kind });
+      row.el = el;
+      if (row.disabled) el.addClass('is-disabled');
+      const text = el.createSpan({ cls: 'vmk-fp-label' });
+      if (row.kind === 'folder' && row.hit >= 0 && row.hitLen) {
+        text.appendText(row.label.slice(0, row.hit));
+        text.createEl('mark', { text: row.label.slice(row.hit, row.hit + row.hitLen) });
+        text.appendText(row.label.slice(row.hit + row.hitLen));
+      } else text.setText(row.label);
+      if (row.kind === 'folder') text.createSpan({ cls: 'vmk-fp-slash', text: '/' });
+      if (row.sub) el.createSpan({ cls: 'vmk-fp-sub', text: row.sub });
+      if (row.meta) el.createSpan({ cls: 'vmk-fp-meta' + (row.warn ? ' is-warn' : ''), text: row.meta });
+      if (row.kind === 'folder' && !row.disabled) {
+        const open = el.createSpan({ cls: 'vmk-fp-open', text: '›', attr: { 'aria-label': 'Open folder' } });
+        open.addEventListener('click', (ev) => { ev.stopPropagation(); this.openRow(row); this.input.focus(); });
+      }
+      el.addEventListener('mousemove', () => { if (!row.disabled && this.sel !== i) this.setSel(i); });
+      el.addEventListener('click', () => { this.activate(row); if (!this.submitted) this.input.focus(); });
+    });
+
+    /* Default selection: where we came from after "..", else "here" unless it is a no-op, else the first folder. */
+    let sel = -1;
+    if (from) sel = this.rows.findIndex((r) => r.folder === from);
+    if (sel < 0 && !navigated && this.input.value.trim()) sel = this.rows.findIndex((r) => !r.disabled);
+    if (sel < 0) {
+      const here = this.rows.findIndex((r) => r.kind === 'here' && !r.disabled && !r.meta);
+      sel = here >= 0 ? here : this.rows.findIndex((r) => r.kind === 'folder' && !r.disabled);
+      if (sel < 0) sel = this.rows.findIndex((r) => r.kind === 'up');
+    }
+    if (sel < 0) sel = this.rows.findIndex((r) => !r.disabled);
+    this.setSel(Math.max(0, sel));
+  }
+
+  renderCrumbs() {
+    const el = this.crumbsEl;
+    el.empty();
+    const chain = [];
+    for (let f = this.folder; f; f = f.parent) { chain.unshift(f); if (f.isRoot()) break; }
+    // Long paths: keep the root and the last two folders.
+    const shown = chain.length > 4 ? [chain[0], null, ...chain.slice(-2)] : chain;
+    for (const f of shown) {
+      if (!f) { el.createSpan({ cls: 'vmk-fp-crumb is-gap', text: '…/' }); continue; }
+      const c = el.createSpan({ cls: 'vmk-fp-crumb', text: (f.isRoot() ? '' : f.name) + '/' });
+      if (f === this.folder) c.addClass('is-current');
+      else c.addEventListener('click', () => { this.navigate(f); this.input.focus(); });
+      if (f.isRoot()) c.setAttribute('aria-label', this.app.vault.getName());
+    }
+  }
+}
+
+function isSubsequence(needle, hay) {
+  let j = 0;
+  for (let i = 0; i < hay.length && j < needle.length; i++) if (hay[i] === needle[j]) j++;
+  return j === needle.length;
+}
+
 /* Telescope-ish picker. Ctrl-n/p move, Ctrl-v/x/t open in split/tab (via the picker context). */
 class PickerModal extends FuzzySuggestModal {
   constructor(plugin, opts) {
@@ -582,8 +884,8 @@ class VimakasePlugin extends Plugin {
     add(g, 'exCopy', 'Copy', [E], ['c'], ex((v) => this.exClip(v, 'copy')));
     add(g, 'exCut', 'Cut', [E], ['x'], ex((v) => this.exClip(v, 'cut')));
     add(g, 'exPaste', 'Paste', [E], ['p'], ex((v) => this.exPaste(v)));
-    add(g, 'exMove', 'Move to path', [E], ['m'], ex((v) => this.exMoveOrCopy(v, 'move')));
-    add(g, 'exCopyTo', 'Copy to path', [E], [], ex((v) => this.exMoveOrCopy(v, 'copy')));
+    add(g, 'exMove', 'Move to folder', [E], ['m'], ex((v) => this.exMoveOrCopy(v, 'move')));
+    add(g, 'exCopyTo', 'Copy to folder', [E], [], ex((v) => this.exMoveOrCopy(v, 'copy')));
     add(g, 'exYankName', 'Copy name', [E], ['y'], ex((v) => this.exYankPath(v, 'name')));
     add(g, 'exYankRel', 'Copy relative path', [E], ['Y'], ex((v) => this.exYankPath(v, 'relative')));
     add(g, 'exYankAbs', 'Copy absolute path', [E], ['gy'], ex((v) => this.exYankPath(v, 'absolute')));
@@ -2077,16 +2379,17 @@ class VimakasePlugin extends Plugin {
   exMoveOrCopy(view, mode) {
     const file = this.focusedFile(view);
     if (!file || (file instanceof TFolder && file.isRoot())) return;
-    new PromptModal(this.app, {
-      title: mode === 'move' ? 'Move to' : 'Copy to',
-      desc: file.path + '  (end with / to keep the name)',
-      value: file.path,
+    new FolderPickerModal(this.app, {
+      mode,
+      file,
+      start: file.parent || this.app.vault.getRoot(),
       onCancel: () => this.refocus(view, file),
-      onSubmit: (value) => this.wrap(async () => {
-        let dest = this.resolveDest(value, file);
-        if (!dest || dest === file.path) {
-          if (mode === 'move' || !dest) return this.refocus(view, file);
-          dest = this.uniquePath(dirname(dest) || '/', file.name);
+      onSubmit: (target) => this.wrap(async () => {
+        let dest = target.kind === 'into' ? joinPath(target.path, file.name) : this.resolveDest(target.path, file);
+        if (!dest) return this.refocus(view, file);
+        if (dest === file.path || (mode === 'copy' && this.get(dest))) {
+          if (mode === 'move') return this.refocus(view, file);
+          dest = this.uniquePath(dirname(dest) || '/', basename(dest));
         }
         if (file instanceof TFolder && (dest + '/').startsWith(file.path + '/')) throw new Error('Cannot ' + mode + ' a folder into itself');
         if (mode === 'move') {
